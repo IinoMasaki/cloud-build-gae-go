@@ -42,6 +42,7 @@ steps:
   args: ['-c', 'rm -rf ${_WORK_DIR}/vendor']
   id: remove-vendor
 
+# Todo:見直し
 # Goapp Test
 - name: gcr.io/cloud-builders/gcloud
   env: ['GOPATH=${_GOPATH}']
@@ -50,11 +51,12 @@ steps:
   args: ['${_GOAPP}', 'test', './src/handler/...']
   id: goapp-test
 
+# Todo:見直し
 # Go Test
 - name: gcr.io/cloud-builders/go
   env: ['GOPATH=${_GOPATH}']
   dir: '${_WORK_DIR}'
-  args: ['test', './src/config/...', './src/domain/...', './src/usecase/...']
+  args: ['test', './src/...']
   id: go-test
 
 # Deploy
