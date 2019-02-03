@@ -1,0 +1,65 @@
+## Memo
+# Cloud Buildは`gcloud app deploy`のみ対応している(`goapp deploy`はフリーズするので使えない)
+# `gcloud app deploy`はVendoring非対応
+# よって、GOPATHにすべてのコードを展開してtest/deployを行う
+
+substitutions:
+  _GOAPP: '/builder/google-cloud-sdk/platform/google_appengine/goapp'
+  _WORK_DIR: 'global/src/github.com/IinoMasaki/cloud-build-gae-go'
+  _GOPATH: '/workspace/global'
+
+steps:
+# Setup Build
+- name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'mkdir -p ${_WORK_DIR}']
+  id: mkdir-work-dir
+
+- name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'cp -r app src ${_WORK_DIR}/']
+  id: copy-code
+
+- name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'cp Gopkg.lock Gopkg.toml ${_WORK_DIR}/']
+  id: copy-gopkg-toml
+
+# Install Package
+- name: masakiiino/dep:latest
+  env: ['GOPATH=/workspace/global']
+  dir: '${_WORK_DIR}'
+  args: ['ensure', '-v', '-vendor-only=true']
+  id: dep-ensure
+
+- name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'cp -r ${_WORK_DIR}/vendor/* /${_GOPATH}/src/']
+  id: copy-package
+
+- name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'rm -rf ${_WORK_DIR}/vendor']
+  id: remove-vendor
+
+# Goapp Test
+- name: gcr.io/cloud-builders/gcloud
+  env: ['GOPATH=${_GOPATH}']
+  dir: '${_WORK_DIR}'
+  entrypoint: python
+  args: ['${_GOAPP}', 'test', './src/handler/...']
+  id: goapp-test
+
+# Go Test
+- name: gcr.io/cloud-builders/go
+  env: ['GOPATH=${_GOPATH}']
+  dir: '${_WORK_DIR}'
+  args: ['test', './src/config/...', './src/domain/...', './src/usecase/...']
+  id: go-test
+
+# Deploy
+- name: gcr.io/cloud-builders/gcloud
+  env: ['GOPATH=${_GOPATH}']
+  dir: '${_WORK_DIR}'
+  args: ['app', '-q', 'deploy', 'app/app.yaml', '--promote']
+  id: deploy-app
